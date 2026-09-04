@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">    
+    <title>Users Dashboard</title>    
+</head>
+<body>
+
+<div class="container">
+    <button class="btn-create"><a class="link-create" href="{{ url_for('create') }}">Create User</a></button>
+    <h2>Users Dashboard</h2>
+    {%with messages = get_flashed_messages()%}
+    {%if messages%}
+    {% for message in messages %}
+    <div class="alert">
+        {{message}}
+        <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>                    
+    </div>
+    {%endfor%}
+    {%endif%}
+    {%endwith%} 
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Toggle Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+                <td>
+                    <span id="status-text-{{ user.id }}" class="status-badge {% if user.status %}status-online{% else %}status-offline{% endif %}">
+                        {% if user.status %}Available{% else %}Unavailable{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" 
+                               class="toggle-availability" 
+                               data-user-id="{{ user.id }}" 
+                               {% if user.status %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    document.querySelectorAll('.toggle-availability').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const userId = this.getAttribute('data-user-id');
+            const isStatus = this.checked;
+            const statusText = document.getElementById(`status-text-${userId}`);
+
+            // Send AJAX request to Flask server
+            fetch('/update_status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: userId, status: isStatus })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update visual UI state cleanly upon database success
+                    if (isStatus) {
+                        statusText.innerText = "Available";
+                        statusText.className = "status-badge status-online";
+                    } else {
+                        statusText.innerText = "Unavailable";
+                        statusText.className = "status-badge status-offline";
+                    }
+                } else {
+                    alert("Failed to update status: " + data.error);
+                    this.checked = !isStatus; // Revert switch if DB write fails
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("An error occurred. Reverting switch status.");
+                this.checked = !isStatus; // Revert switch on network error
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
